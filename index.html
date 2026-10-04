@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบสารสนเทศข้อมูลลงทะเบียนทางหลวงท้องถิ่น</title>
+  <!-- Bootstrap 5 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Google Fonts (Sarabun) -->
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background-color: #ffffff;
+      color: #333333;
+    }
+    .header-panel {
+      background-color: #198754;
+      color: #ffffff;
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .card {
+      border: 1px solid #e0e0e0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .table-container {
+      max-height: 65vh;
+      overflow-y: auto;
+    }
+    .table-custom {
+      margin-bottom: 0;
+    }
+    .table-custom thead th {
+      position: sticky;
+      top: 0;
+      background-color: #198754 !important;
+      color: #ffffff !important;
+      white-space: nowrap;
+      z-index: 10;
+      box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
+    }
+  </style>
+</head>
+<body class="p-3 p-md-4">
+
+  <div class="container-fluid">
+    <!-- Header Panel -->
+    <div class="header-panel d-flex justify-content-between align-items-center">
+      <div>
+        <h3 class="mb-1">🛣️ ระบบฐานข้อมูลสารสนเทศทางหลวงท้องถิ่น</h3>
+        <p class="mb-0 text-light opacity-75">จัดการข้อมูลการลงทะเบียนทางหลวง เอกสารแนบ และสายทาง</p>
+      </div>
+      <button class="btn btn-light text-success fw-bold" onclick="openModal()">
+        + เพิ่มข้อมูลสายทาง
+      </button>
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <div class="card mb-3">
+      <div class="card-body py-2">
+        <div class="row g-2">
+          <div class="col-md-8">
+            <input type="text" id="searchInput" class="form-control" placeholder="ค้นหา รหัสสายทาง, ชื่อถนน, หรือ หมู่บ้าน..." onkeyup="filterTable()">
+          </div>
+          <div class="col-md-4 text-end">
+            <button class="btn btn-outline-secondary w-100" onclick="loadData()">🔄 รีเฟรชและซิงก์โฟลเดอร์</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-container">
+          <table class="table table-hover table-striped align-middle table-custom">
+            <thead>
+              <tr>
+                <th class="text-center" style="width: 60px;">ลำดับ</th>
+                <th>รหัสสายทาง / ชื่อถนน</th>
+                <th class="text-end">ความยาว (กม.)</th>
+                <th>ประเภท</th>
+                <th>หมู่บ้าน / พื้นที่</th>
+                <th>ข้อมูลสายทาง</th>
+                <th class="text-center">โฟลเดอร์เอกสาร</th>
+                <th class="text-center" style="width: 80px;">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr>
+                <td colspan="8" class="text-center py-4">กำลังโหลดข้อมูลและตรวจสอบความถูกต้องของโฟลเดอร์...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bridge/Landing Modal สำหรับสายทางที่คลิกมาจาก GIS -->
+  <div class="modal fade" id="bridgeModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content shadow-lg border-0 rounded-4">
+        <div class="modal-header bg-success text-white rounded-top-4">
+          <h5 class="modal-title fw-bold" id="bridgeModalTitle">📍 สายทางจากแผนที่ GIS</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4 text-center">
+          <div class="mb-3">
+            <span class="badge bg-success-subtle text-success border border-success px-3 py-2 fs-6 rounded-pill" id="bridgeCodeBadge">-</span>
+          </div>
+          <h5 class="fw-bold text-dark mb-1" id="bridgeRouteName">-</h5>
+          <p class="text-muted mb-4" id="bridgeDetailText">-</p>
+
+          <div class="d-grid gap-2">
+            <a id="btnBridgeOpenDrive" href="#" target="_blank" class="btn btn-success btn-lg fw-bold shadow-sm py-2.5">
+              📁 เปิดโฟลเดอร์เอกสาร Google Drive
+            </a>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+              📊 ดูและจัดการข้อมูลในตารางระบบ
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Form -->
+  <div class="modal fade" id="formModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title" id="modalTitle">เพิ่มข้อมูลสายทาง</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="highwayForm" onsubmit="handleFormSubmit(event)">
+          <div class="modal-body">
+            <input type="hidden" id="rowIndex" name="rowIndex">
+            <input type="hidden" id="folderUrl" name="folderUrl">
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">รหัสสายทาง / ชื่อสายทาง</label>
+                <input type="text" class="form-control" id="code" name="code" required placeholder="ชร.ถ.75-017">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">ความยาว (กม.)</label>
+                <input type="number" step="0.000001" class="form-control" id="length" name="length" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">ประเภท</label>
+                <input type="text" class="form-control" id="type" name="type" placeholder="ถนนที่ลงทะเบียนแล้ว">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">หมู่บ้าน / พื้นที่</label>
+                <input type="text" class="form-control" id="village" name="village">
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">ข้อมูลสายทาง (อ้างอิงรหัสย่อ)</label>
+                <input type="text" class="form-control" id="routeInfo" name="routeInfo">
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">แนบไฟล์เอกสาร (PDF / รูปภาพ)</label>
+                <input type="file" class="form-control" id="fileInput" accept="image/*,.pdf">
+                <div class="form-text">ระบบจะสร้าง/บันทึกไฟล์ลงโฟลเดอร์เลข 3 หลักตามรหัสสายทางให้อัตโนมัติ</div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+            <button type="submit" class="btn btn-success" id="btnSave">บันทึกข้อมูล</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // URL ของ Google Apps Script API Endpoint ที่ได้จากขั้นตอนที่ 1
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyQiWdpwmVg10oTaCWdH_K1oEU__a5TjFzHXmB8Vvl1rcnZUy_yjNqXhorWv67JXBg/exec";
+
+    let rawData = [];
+    let modalInstance = null;
+    let bridgeModalInstance = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      modalInstance = new bootstrap.Modal(document.getElementById('formModal'));
+      bridgeModalInstance = new bootstrap.Modal(document.getElementById('bridgeModal'));
+      loadData();
+    });
+
+    function loadData() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">กำลังโหลดข้อมูลและตรวจสอบความถูกต้องของโฟลเดอร์...</td></tr>';
+
+      fetch(GAS_API_URL)
+        .then(res => res.json())
+        .then(response => {
+          if (response.success) {
+            rawData = response.data;
+            renderTable(rawData);
+            checkUrlParameters();
+          } else {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">เกิดข้อผิดพลาด: ${response.error}</td></tr>`;
+          }
+        })
+        .catch(err => {
+          tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">Connection Error: ${err}</td></tr>`;
+        });
+    }
+
+    // ตรวจจับคีย์รหัสสายทางที่มาจากแผนที่ GIS ผ่าน URL Parameter
+    function checkUrlParameters() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const codeParam = urlParams.get('code');
+
+      if (codeParam) {
+        document.getElementById('searchInput').value = codeParam;
+        filterTable();
+
+        const matched = rawData.find(item => 
+          item.code.toLowerCase().includes(codeParam.toLowerCase()) || 
+          codeParam.toLowerCase().includes(item.code.toLowerCase())
+        );
+
+        if (matched) {
+          document.getElementById('bridgeCodeBadge').innerText = matched.code;
+          document.getElementById('bridgeRouteName').innerText = matched.routeInfo || matched.code;
+          document.getElementById('bridgeDetailText').innerText = `หมู่บ้าน/พื้นที่: ${matched.village || '-'} | ระยะทาง: ${Number(matched.length).toFixed(4)} กม.`;
+          document.getElementById('btnBridgeOpenDrive').href = matched.folderUrl || '#';
+          bridgeModalInstance.show();
+        }
+      }
+    }
+
+    function renderTable(items) {
+      const tbody = document.getElementById('tableBody');
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">ไม่พบข้อมูลในระบบ</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = items.map(item => `
+        <tr>
+          <td class="text-center">${item.id}</td>
+          <td class="fw-bold">${escapeHtml(item.code)}</td>
+          <td class="text-end">${Number(item.length).toFixed(4)}</td>
+          <td>${escapeHtml(item.type)}</td>
+          <td>${escapeHtml(item.village)}</td>
+          <td><span class="badge bg-light text-dark border">${escapeHtml(item.routeInfo)}</span></td>
+          <td class="text-center">
+            ${item.folderUrl ? `<a href="${item.folderUrl}" target="_blank" class="btn btn-sm btn-outline-success">📁 เปิดโฟลเดอร์</a>` : '<span class="text-muted">-</span>'}
+          </td>
+          <td class="text-center">
+            <button class="btn btn-sm btn-warning" onclick="editRecord(${item.rowIndex})">แก้ไข</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function filterTable() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = rawData.filter(item => 
+        item.code.toLowerCase().includes(query) ||
+        item.village.toLowerCase().includes(query) ||
+        item.routeInfo.toLowerCase().includes(query)
+      );
+      renderTable(filtered);
+    }
+
+    function suggestNextRouteCode() {
+      if (!rawData || rawData.length === 0) {
+        return { code: 'ชร.ถ.75-001', info: 'ชร.ถ.75-001' };
+      }
+
+      let maxNum = 0;
+      let prefix = 'ชร.ถ.75-';
+
+      rawData.forEach(item => {
+        const text = (item.code + ' ' + item.routeInfo).trim();
+        const match = text.match(/-\s*(\d+)/) || text.match(/\d+/g);
+        if (match) {
+          const num = parseInt(Array.isArray(match) ? match[match.length - 1] : match, 10);
+          if (num > maxNum) {
+            maxNum = num;
+          }
+        }
+        const prefMatch = item.code.match(/^[^\d]+\.\d+-/);
+        if (prefMatch) {
+          prefix = prefMatch[0];
+        }
+      });
+
+      const nextNum = maxNum + 1;
+      const formattedNum = String(nextNum).padStart(3, '0');
+      const suggestedCode = `${prefix}${formattedNum}`;
+
+      return {
+        code: suggestedCode,
+        info: suggestedCode
+      };
+    }
+
+    function openModal() {
+      document.getElementById('highwayForm').reset();
+      document.getElementById('rowIndex').value = '';
+      document.getElementById('modalTitle').innerText = 'เพิ่มข้อมูลสายทาง';
+
+      const nextSuggest = suggestNextRouteCode();
+      document.getElementById('code').value = nextSuggest.code;
+      document.getElementById('routeInfo').value = nextSuggest.info;
+      document.getElementById('type').value = 'ถนนที่ลงทะเบียนแล้ว';
+
+      modalInstance.show();
+    }
+
+    function editRecord(rowIndex) {
+      const record = rawData.find(r => r.rowIndex === rowIndex);
+      if (!record) return;
+
+      document.getElementById('rowIndex').value = record.rowIndex;
+      document.getElementById('code').value = record.code;
+      document.getElementById('length').value = record.length;
+      document.getElementById('type').value = record.type;
+      document.getElementById('village').value = record.village;
+      document.getElementById('routeInfo').value = record.routeInfo;
+      document.getElementById('folderUrl').value = record.folderUrl;
+
+      document.getElementById('modalTitle').innerText = 'แก้ไขข้อมูลสายทาง';
+      modalInstance.show();
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const btnSave = document.getElementById('btnSave');
+      btnSave.disabled = true;
+      btnSave.innerText = 'กำลังบันทึก...';
+
+      const formData = {
+        rowIndex: document.getElementById('rowIndex').value,
+        code: document.getElementById('code').value,
+        length: document.getElementById('length').value,
+        type: document.getElementById('type').value,
+        village: document.getElementById('village').value,
+        routeInfo: document.getElementById('routeInfo').value,
+        folderUrl: document.getElementById('folderUrl').value
+      };
+
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          const base64String = evt.target.result.split(',')[1];
+          const fileData = {
+            filename: file.name,
+            mimeType: file.type,
+            base64: base64String
+          };
+          sendSaveRequest(formData, fileData);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        sendSaveRequest(formData, null);
+      }
+    }
+
+    function sendSaveRequest(formData, fileData) {
+      const payload = {
+        action: 'saveRecord',
+        formData: formData,
+        fileData: fileData
+      };
+
+      fetch(GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(res => {
+        document.getElementById('btnSave').disabled = false;
+        document.getElementById('btnSave').innerText = 'บันทึกข้อมูล';
+        if (res.success) {
+          modalInstance.hide();
+          loadData();
+        } else {
+          alert('เกิดข้อผิดพลาด: ' + res.error);
+        }
+      })
+      .catch(err => {
+        document.getElementById('btnSave').disabled = false;
+        document.getElementById('btnSave').innerText = 'บันทึกข้อมูล';
+        alert('เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + err);
+      });
+    }
+
+    function escapeHtml(text) {
+      return text ? String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
+    }
+  </script>
+</body>
+</html>
